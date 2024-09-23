@@ -1,0 +1,17 @@
+[package]
+name = "TokenDaysDestroyedStaking"
+version = "0.1.0"
+authors = ["Your Name <your.email@example.com>"]
+
+[dependencies]
+MovementFramework = { git = "https://github.com/movementlabs/movement-core.git", subdir = "movement-framework", rev = "main" }
+
+[addresses]
+std = "0x1"
+TokenDaysDestroyedStaking = "0xYourModuleAddressHere"
+
+[build]
+language_version = "0.1.0"
+
+[dev-addresses]
+default = "0xYourDevAddressHere"
