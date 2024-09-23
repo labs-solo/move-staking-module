@@ -4,14 +4,19 @@ version = "0.1.0"
 authors = ["Your Name <your.email@example.com>"]
 
 [dependencies]
-MovementFramework = { git = "https://github.com/movementlabs/movement-core.git", subdir = "movement-framework", rev = "main" }
+MovementFramework = { git = "https://github.com/movementlabs/movement-core.git", rev = "main" }
 
 [addresses]
 std = "0x1"
-TokenDaysDestroyedStaking = "0xYourModuleAddressHere"
+TokenDaysDestroyedStaking = "0xB0B0B0B0B0B0B0B0"  # Example module address for testing
+AnotherModule = "0xA1A1A1A1A1A1A1A1"  # Placeholder for another module
+SomeOtherModule = "0xC2C2C2C2C2C2C2C2"  # Placeholder for some other module
 
 [build]
 language_version = "0.1.0"
 
 [dev-addresses]
-default = "0xYourDevAddressHere"
+default = "0xD3D3D3D3D3D3D3D3"  # Replace with a valid development address
+AdminAddress = "0xD3D3D3D3D3D3D3D3"  # Placeholder for admin address
+TreasuryAddress = "0xE4E4E4E4E4E4E4E4"  # Placeholder for treasury address
+UserAddress = "0xF5F5F5F5F5F5F5F5"  # Placeholder for user address

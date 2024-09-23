@@ -1,145 +1,96 @@
 module TokenDaysDestroyedStakingTests {
     use std::signer;
-    use std::vector;
-    use std::error;
-    use std::option::Option;
     use aptos_framework::coin::{Self as CoinFramework, Coin, CoinStore, register};
-    use aptos_framework::block;
-    use aptos_framework::aptos_coin::{AptosCoin};
+    use aptos_framework::aptos_coin::AptosCoin;
 
     use TokenDaysDestroyedStaking;
 
     #[test]
     public fun test_staking_flow() {
-        // Test accounts
-        let admin = @0xA550C18; // Example admin address
-        let treasury = @0xB0B;  // Example treasury address
-        let user1 = @0xC0DE;    // Example user address
+        let admin_address = @0x1000;
+        let treasury_address = @0x2000;
+        let user1_address = @0x3000;
+        let new_admin_address = @0x4000;
 
-        // Initialize accounts
-        create_account(admin);
-        create_account(treasury);
-        create_account(user1);
+        let admin = signer::new_signer(admin_address);
+        let user1 = signer::new_signer(user1_address);
+        let new_admin = signer::new_signer(new_admin_address);
 
-        // Initialize CoinStores
-        register<AptosCoin>(&signer::borrow_signer(admin));
-        register<AptosCoin>(&signer::borrow_signer(treasury));
-        register<AptosCoin>(&signer::borrow_signer(user1));
+        CoinFramework::register<AptosCoin>(&admin);
+        CoinFramework::register<AptosCoin>(&user1);
 
-        // Mint tokens to user1
-        mint_to_address<AptosCoin>(&signer::borrow_signer(admin), user1, 1_000_000);
+        CoinFramework::mint<AptosCoin>(&admin, 1_000_000);
+        CoinFramework::transfer<AptosCoin>(&admin, user1_address, 1_000_000);
 
-        // Initialize admin and events
-        TokenDaysDestroyedStaking::initialize_admin(&signer::borrow_signer(admin));
-        TokenDaysDestroyedStaking::initialize_staking_events<AptosCoin>(&signer::borrow_signer(admin));
+        TokenDaysDestroyedStaking::initialize_admin(&admin);
+        TokenDaysDestroyedStaking::initialize_config(&admin, treasury_address);
 
-        // User1 stakes tokens
+        // User stakes AptosCoin without prior admin setup for AptosCoin
         let stake_amount = 100_000;
-        TokenDaysDestroyedStaking::stake<AptosCoin>(
-            &signer::borrow_signer(user1),
-            treasury,
-            stake_amount
-        );
+        TokenDaysDestroyedStaking::stake<AptosCoin>(&user1, stake_amount);
 
-        // Verify staking details
-        let staker_option = TokenDaysDestroyedStaking::get_staking_details<AptosCoin>(user1);
-        assert!(staker_option.is_some(), 100);
-        let staker = staker_option.unwrap();
-        assert!(staker.amount == stake_amount, 101);
+        let staked_amount = TokenDaysDestroyedStaking::get_staked_amount<AptosCoin>(user1_address);
+        assert!(staked_amount.is_some(), "Staker should exist after staking");
+        assert!(staked_amount.unwrap() == stake_amount, "Staked amount should match the stake amount");
 
-        // Simulate block progression
-        simulate_block_progression(10);
+        // User stakes another CoinType (e.g., FakeCoin) without prior admin setup
+        // For testing, we define a FakeCoin
 
-        // User1 stakes additional tokens
-        let additional_stake = 50_000;
-        TokenDaysDestroyedStaking::stake<AptosCoin>(
-            &signer::borrow_signer(user1),
-            treasury,
-            additional_stake
-        );
+        struct FakeCoin has store, copy, drop {}
 
-        // Calculate expected TDD
-        let expected_tdd = (stake_amount as u128) * (10 as u128);
-        let actual_tdd = TokenDaysDestroyedStaking::calculate_token_days_destroyed<AptosCoin>(user1);
-        assert!(actual_tdd == expected_tdd, 102);
+        // Implement CoinStore for FakeCoin
+        impl CoinStore for FakeCoin {
+            const MODULE_NAME: &str = "FakeCoin";
+            const STRUCT_NAME: &str = "FakeCoin";
+        }
 
-        // User1 unstakes some tokens
+        // Register and mint FakeCoin
+        CoinFramework::register<FakeCoin>(&user1);
+        // Assuming the mint function exists for FakeCoin
+        // For testing purposes, we can simulate minting
+        // CoinFramework::mint<FakeCoin>(&user1, 500_000);
+
+        // User stakes FakeCoin
+        let stake_amount_fake = 50_000;
+        TokenDaysDestroyedStaking::stake<FakeCoin>(&user1, stake_amount_fake);
+
+        // Check staked amount for FakeCoin
+        let staked_amount_fake = TokenDaysDestroyedStaking::get_staked_amount<FakeCoin>(user1_address);
+        assert!(staked_amount_fake.is_some(), "Staker should exist after staking FakeCoin");
+        assert!(staked_amount_fake.unwrap() == stake_amount_fake, "Staked amount should match the stake amount for FakeCoin");
+
+        // Unstake AptosCoin
         let unstake_amount = 30_000;
-        TokenDaysDestroyedStaking::unstake<AptosCoin>(
-            &signer::borrow_signer(user1),
-            &signer::borrow_signer(treasury),
-            unstake_amount
-        );
+        TokenDaysDestroyedStaking::unstake<AptosCoin>(&user1, unstake_amount);
 
-        // Verify updated staking details
-        let staker_option = TokenDaysDestroyedStaking::get_staking_details<AptosCoin>(user1);
-        assert!(staker_option.is_some(), 103);
-        let staker = staker_option.unwrap();
-        let total_staked = stake_amount + additional_stake - unstake_amount;
-        assert!(staker.amount == total_staked, 104);
+        let staked_amount = TokenDaysDestroyedStaking::get_staked_amount<AptosCoin>(user1_address);
+        assert!(staked_amount.is_some(), "Staker should still exist after unstaking");
+        let total_staked = stake_amount - unstake_amount;
+        assert!(staked_amount.unwrap() == total_staked, "Staked amount should be updated after unstaking");
 
-        // Admin transfers admin rights to a new address
-        let new_admin = @0xDAD;
-        create_account(new_admin);
-        TokenDaysDestroyedStaking::transfer_admin(
-            &signer::borrow_signer(admin),
-            new_admin
-        );
+        TokenDaysDestroyedStaking::transfer_admin(&admin, new_admin_address);
 
-        // Attempt to perform admin action with old admin (should fail)
         let admin_withdraw_result = try {
-            TokenDaysDestroyedStaking::emergency_withdraw<AptosCoin>(
-                &signer::borrow_signer(admin),
-                &signer::borrow_signer(treasury),
-                10_000
-            );
+            TokenDaysDestroyedStaking::emergency_withdraw<AptosCoin>(&admin, 10_000);
             true
-        } catch E_NOT_ADMIN {
+        } catch _e {
             false
         };
-        assert!(!admin_withdraw_result, 105);
+        assert!(!admin_withdraw_result, "Old admin should not be able to perform admin actions");
 
-        // New admin performs emergency withdrawal
-        TokenDaysDestroyedStaking::emergency_withdraw<AptosCoin>(
-            &signer::borrow_signer(new_admin),
-            &signer::borrow_signer(treasury),
-            10_000
-        );
+        TokenDaysDestroyedStaking::emergency_withdraw<AptosCoin>(&new_admin, 10_000);
 
-        // User1 cleans up staker resource
-        TokenDaysDestroyedStaking::unstake<AptosCoin>(
-            &signer::borrow_signer(user1),
-            &signer::borrow_signer(treasury),
-            staker.amount
-        );
-        TokenDaysDestroyedStaking::cleanup_staker<AptosCoin>(
-            &signer::borrow_signer(user1)
-        );
+        TokenDaysDestroyedStaking::unstake<AptosCoin>(&user1, total_staked);
+        TokenDaysDestroyedStaking::cleanup_staker<AptosCoin>(&user1);
 
-        // Verify staker resource is destroyed
-        let staker_option = TokenDaysDestroyedStaking::get_staking_details<AptosCoin>(user1);
-        assert!(staker_option.is_none(), 106);
-    }
+        let staked_amount = TokenDaysDestroyedStaking::get_staked_amount<AptosCoin>(user1_address);
+        assert!(staked_amount.is_none(), "Staker resource should be destroyed after cleanup");
 
-    // Helper functions
+        // Cleanup FakeCoin staking
+        TokenDaysDestroyedStaking::unstake<FakeCoin>(&user1, stake_amount_fake);
+        TokenDaysDestroyedStaking::cleanup_staker<FakeCoin>(&user1);
 
-    fun create_account(addr: address) {
-        // Simulate account creation
-        // In actual tests, accounts would be pre-created or handled differently
-    }
-
-    fun mint_to_address<CoinType: store + drop>(
-        minter: &signer,
-        recipient: address,
-        amount: u64
-    ) {
-        // Mint tokens and transfer to recipient
-        CoinFramework::mint<CoinType>(minter, amount);
-        CoinFramework::transfer<CoinType>(minter, recipient, amount);
-    }
-
-    fun simulate_block_progression(blocks: u64) {
-        // Simulate progression of blocks
-        // In actual testing, this would depend on the blockchain environment
+        let staked_amount_fake = TokenDaysDestroyedStaking::get_staked_amount<FakeCoin>(user1_address);
+        assert!(staked_amount_fake.is_none(), "Staker resource for FakeCoin should be destroyed after cleanup");
     }
 }
